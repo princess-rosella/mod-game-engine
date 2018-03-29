@@ -24,26 +24,22 @@
  * @LICENSE_HEADER_END@
  */
 
-const gulp    = require("gulp");
-const ts      = require("gulp-typescript");
-const path    = require("path");
-const cwd     = process.cwd();
-const dirName = path.relative(cwd, __dirname);
+import { IScreen, IElement, ILayer, ISurface } from "../Interfaces";
 
-const tsEngineProject = ts.createProject(path.join(dirName, "tsconfig.json"), {
-    outFile:    path.join(cwd, "dist", "engine.js"),
-    rootDir:    path.join(dirName, "src")
-});
+export const enum ElementFlags {
+    NeedsReordering = 1 << 0,
+}
 
-gulp.task("engine", function() {
-    const merge   = require('merge2');
-    const sources = gulp.src(path.join(dirName, "src/**/*.ts"));
-    const outputs = sources.pipe(tsEngineProject());
+export interface IScreenWebGL extends IScreen {
+    readonly context: WebGLRenderingContext;
+}
 
-    return merge(
-        outputs.js.pipe(gulp.dest("dist")),
-        outputs.dts.pipe(gulp.dest("dist"))
-    );
-});
+export interface IElementWebGL extends IElement {
+    parent: ILayer | null;
+    draw(surface: ISurface): void;
+}
 
-gulp.watch(path.join(dirName, "src/**/*.ts"), ["engine"]);
+export interface ILayerWebGL extends ILayer {
+    flags:    ElementFlags;
+    elements: IElementWebGL[];
+}

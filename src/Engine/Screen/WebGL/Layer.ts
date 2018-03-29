@@ -24,26 +24,41 @@
  * @LICENSE_HEADER_END@
  */
 
-const gulp    = require("gulp");
-const ts      = require("gulp-typescript");
-const path    = require("path");
-const cwd     = process.cwd();
-const dirName = path.relative(cwd, __dirname);
+import { Element } from "./Element";
+import { IReadonlyMatrix3 } from "../../Math/Matrix3";
+import { IScreenWebGL, IElementWebGL, ILayerWebGL, ElementFlags } from "./Interfaces";
+import { ElementType, ISurface } from "../Interfaces";
 
-const tsEngineProject = ts.createProject(path.join(dirName, "tsconfig.json"), {
-    outFile:    path.join(cwd, "dist", "engine.js"),
-    rootDir:    path.join(dirName, "src")
-});
+export class Layer extends Element implements ILayerWebGL {
+    elements: IElementWebGL[] = [];
 
-gulp.task("engine", function() {
-    const merge   = require('merge2');
-    const sources = gulp.src(path.join(dirName, "src/**/*.ts"));
-    const outputs = sources.pipe(tsEngineProject());
+    constructor(screen: IScreenWebGL, matrix?: IReadonlyMatrix3, z?: number) {
+        super(screen, matrix, z);
+    }
 
-    return merge(
-        outputs.js.pipe(gulp.dest("dist")),
-        outputs.dts.pipe(gulp.dest("dist"))
-    );
-});
+    get screenElementType(): ElementType {
+        return ElementType.Layer;
+    }
 
-gulp.watch(path.join(dirName, "src/**/*.ts"), ["engine"]);
+    draw(surface: ISurface): void {
+        if (this.flags & ElementFlags.NeedsReordering) {
+            this.flags &= ~ElementFlags.NeedsReordering
+            this.elements.sort((a, b) => {
+                return a.z - b.z;
+            });
+        }
+
+        for (const element of this.elements)
+            element.draw(surface);
+    }
+}
+
+export class MainLayer extends Layer {
+    set z(z: number) {
+        throw new Error("The screen's main layer can't be reordered. It is always 0.");
+    }
+
+    detach(): void {
+        throw new Error("The screen's main layer can't be detached.");
+    }
+}

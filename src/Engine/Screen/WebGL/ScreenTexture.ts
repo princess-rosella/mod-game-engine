@@ -23,27 +23,3 @@
  *
  * @LICENSE_HEADER_END@
  */
-
-const gulp    = require("gulp");
-const ts      = require("gulp-typescript");
-const path    = require("path");
-const cwd     = process.cwd();
-const dirName = path.relative(cwd, __dirname);
-
-const tsEngineProject = ts.createProject(path.join(dirName, "tsconfig.json"), {
-    outFile:    path.join(cwd, "dist", "engine.js"),
-    rootDir:    path.join(dirName, "src")
-});
-
-gulp.task("engine", function() {
-    const merge   = require('merge2');
-    const sources = gulp.src(path.join(dirName, "src/**/*.ts"));
-    const outputs = sources.pipe(tsEngineProject());
-
-    return merge(
-        outputs.js.pipe(gulp.dest("dist")),
-        outputs.dts.pipe(gulp.dest("dist"))
-    );
-});
-
-gulp.watch(path.join(dirName, "src/**/*.ts"), ["engine"]);

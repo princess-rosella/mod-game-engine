@@ -24,26 +24,39 @@
  * @LICENSE_HEADER_END@
  */
 
-const gulp    = require("gulp");
-const ts      = require("gulp-typescript");
-const path    = require("path");
-const cwd     = process.cwd();
-const dirName = path.relative(cwd, __dirname);
+import { Rectangle } from "../../Types";
+import { ICell } from "../Interfaces";
 
-const tsEngineProject = ts.createProject(path.join(dirName, "tsconfig.json"), {
-    outFile:    path.join(cwd, "dist", "engine.js"),
-    rootDir:    path.join(dirName, "src")
-});
+export const enum CellOwnership {
+    OwnTexture  = 1 << 0,
+    OwnVertexes = 1 << 1
+};
 
-gulp.task("engine", function() {
-    const merge   = require('merge2');
-    const sources = gulp.src(path.join(dirName, "src/**/*.ts"));
-    const outputs = sources.pipe(tsEngineProject());
+export class Cell implements ICell {
+    tex:         WebGLTexture | null;
+    vertexes:    WebGLBuffer  | null;
+    index:       number;
+    count:       number;
+    boundingBox: Rectangle;
+    ownership:   CellOwnership;
 
-    return merge(
-        outputs.js.pipe(gulp.dest("dist")),
-        outputs.dts.pipe(gulp.dest("dist"))
-    );
-});
+    constructor(tex: WebGLTexture, vertexes: WebGLBuffer, index: number, count: number, boundingBox: Rectangle, ownership: CellOwnership) {
+        this.tex         = tex;
+        this.vertexes    = vertexes;
+        this.index       = index;
+        this.count       = count;
+        this.boundingBox = boundingBox;
+        this.ownership   = ownership;
+    }
 
-gulp.watch(path.join(dirName, "src/**/*.ts"), ["engine"]);
+    invalidate(context: WebGLRenderingContext): void {
+        if (this.tex && (this.ownership & CellOwnership.OwnTexture))
+            context.deleteTexture(this.tex);
+
+        if (this.vertexes && (this.ownership & CellOwnership.OwnVertexes))
+            context.deleteBuffer(this.vertexes);
+
+        this.tex      = null;
+        this.vertexes = null;
+    }
+}

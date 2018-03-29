@@ -24,26 +24,39 @@
  * @LICENSE_HEADER_END@
  */
 
-const gulp    = require("gulp");
-const ts      = require("gulp-typescript");
-const path    = require("path");
-const cwd     = process.cwd();
-const dirName = path.relative(cwd, __dirname);
+import { Element } from "./Element";
+import { IReadonlyMatrix3 } from "../../Math/Matrix3";
+import { ICell, ISprite, ElementType, ISurface } from "../Interfaces";
+import { IScreenWebGL } from "./Interfaces";
 
-const tsEngineProject = ts.createProject(path.join(dirName, "tsconfig.json"), {
-    outFile:    path.join(cwd, "dist", "engine.js"),
-    rootDir:    path.join(dirName, "src")
-});
+export class Sprite extends Element implements ISprite {
+    _cell: ICell | null = null;
 
-gulp.task("engine", function() {
-    const merge   = require('merge2');
-    const sources = gulp.src(path.join(dirName, "src/**/*.ts"));
-    const outputs = sources.pipe(tsEngineProject());
+    constructor(screen: IScreenWebGL, matrix?: IReadonlyMatrix3, z?: number) {
+        super(screen, matrix, z);
+    }
 
-    return merge(
-        outputs.js.pipe(gulp.dest("dist")),
-        outputs.dts.pipe(gulp.dest("dist"))
-    );
-});
+    get screenElementType(): ElementType {
+        return ElementType.Sprite;
+    }
 
-gulp.watch(path.join(dirName, "src/**/*.ts"), ["engine"]);
+    get cell(): ICell | null {
+        return this._cell;
+    }
+
+    set cell(newCell: ICell | null) {
+        if (this._cell === newCell)
+            return;
+
+        this.screen.dirty = true;
+        this._cell = newCell;
+    }
+
+    draw(surface: ISurface): void {
+        const cell = this._cell;
+        if (!cell)
+            return;
+
+        surface.draw(this.effectiveMatrix, cell);
+    }
+}

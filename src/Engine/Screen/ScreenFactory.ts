@@ -24,26 +24,20 @@
  * @LICENSE_HEADER_END@
  */
 
-const gulp    = require("gulp");
-const ts      = require("gulp-typescript");
-const path    = require("path");
-const cwd     = process.cwd();
-const dirName = path.relative(cwd, __dirname);
+import { ScreenPhysical } from "./WebGL/ScreenPhysical";
+import { Features, IScreen } from "./Interfaces";
 
-const tsEngineProject = ts.createProject(path.join(dirName, "tsconfig.json"), {
-    outFile:    path.join(cwd, "dist", "engine.js"),
-    rootDir:    path.join(dirName, "src")
-});
+export class ScreenFactory {
+    static create(canvas: HTMLCanvasElement, features: Features): IScreen {
+        const attributes = ScreenPhysical.attributesForFeatures(features);
+        let   context    = undefined;//canvas.getContext('webgl2', attributes);
 
-gulp.task("engine", function() {
-    const merge   = require('merge2');
-    const sources = gulp.src(path.join(dirName, "src/**/*.ts"));
-    const outputs = sources.pipe(tsEngineProject());
+        if (!context)
+            context = canvas.getContext('webgl', attributes) || canvas.getContext('experimental-webgl', attributes);
 
-    return merge(
-        outputs.js.pipe(gulp.dest("dist")),
-        outputs.dts.pipe(gulp.dest("dist"))
-    );
-});
+        if (!context)
+            throw new Error("WebGL unsupported");
 
-gulp.watch(path.join(dirName, "src/**/*.ts"), ["engine"]);
+        return new ScreenPhysical(canvas, features, <WebGLRenderingContext>context)
+    }
+}

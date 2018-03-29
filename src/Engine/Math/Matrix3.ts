@@ -423,7 +423,7 @@ export class VersionnedMatrix3 extends Matrix3 implements IVersionnedMatrix3, IM
      *
      * @param other Other matrix
      */
-    setMatrix(other: IMatrix3): this {
+    setMatrix(other: IReadonlyMatrix3): this {
         if (other === this)
             return this;
 

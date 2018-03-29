@@ -24,20 +24,24 @@
  * @LICENSE_HEADER_END@
  */
 
-export interface Point {
-    x: number;
-    y: number;
-}
+import { IFiber } from "./Scheduler";
 
-export interface Size {
-    width:  number;
-    height: number;
-}
+export class Fiber implements IFiber {
+    readonly generator: Generator;
+    readonly name:      string;
 
-export interface Rectangle extends Point, Size {
-}
+    constructor(name: string, generator: Generator) {
+        this.name      = name;
+        this.generator = generator;
+    }
 
-export interface Fraction {
-    num:   number;
-    denom: number;
+    start(): void {
+    }
+
+    tick(counter: number, time: number, skip: boolean): void {
+        this.generator.next();
+    }
+
+    stop(): void {
+    }
 }

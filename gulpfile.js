@@ -27,18 +27,22 @@
 const gulp    = require("gulp");
 const ts      = require("gulp-typescript");
 const path    = require("path");
+const merge   = require("merge2");
 const cwd     = process.cwd();
 const dirName = path.relative(cwd, __dirname);
 
-const tsEngineProject = ts.createProject(path.join(dirName, "tsconfig.json"), {
-    outFile:    path.join(cwd, "dist", "engine.js"),
-    rootDir:    path.join(dirName, "src")
+const tsEngineSourceProject = ts.createProject(path.join(dirName, "tsconfig.json"), {
+    outFile: path.join(cwd, "dist", "engine.js"),
+    rootDir: path.join(dirName, "src")
 });
 
-gulp.task("engine", function() {
-    const merge   = require('merge2');
+const tsEngineToolsProject = ts.createProject(path.join(dirName, "tools.tsconfig.json"), {
+    rootDir: path.join(dirName, "tools")
+});
+
+gulp.task("engine-src", function() {
     const sources = gulp.src(path.join(dirName, "src/**/*.ts"));
-    const outputs = sources.pipe(tsEngineProject());
+    const outputs = sources.pipe(tsEngineSourceProject());
 
     return merge(
         outputs.js.pipe(gulp.dest("dist")),
@@ -46,4 +50,14 @@ gulp.task("engine", function() {
     );
 });
 
-gulp.watch(path.join(dirName, "src/**/*.ts"), ["engine"]);
+gulp.task("engine-tools", function() {
+    const sources = gulp.src(path.join(dirName, "tools/**/*.ts"));
+    const outputs = sources.pipe(tsEngineToolsProject());
+
+    return outputs.js.pipe(gulp.dest("dist/tools"));
+});
+
+gulp.task("engine", ["engine-src", "engine-tools"]);
+
+gulp.watch(path.join(dirName, "src/**/*.ts"),   ["engine-src"]);
+gulp.watch(path.join(dirName, "tools/**/*.ts"), ["engine-tools"]);

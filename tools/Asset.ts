@@ -24,24 +24,32 @@
  * @LICENSE_HEADER_END@
  */
 
-export const enum AssetType {
-    Cell          = "cell",
-    CellTransform = "cell-transform",
-    Font          = "font",
-    Loop          = "loop",
-    Object        = "object",
-}
+import { AssetDefinition } from "./AssetDefinition";
+import { AssetManifest }   from "./AssetManifest";
+import { Rectangle }       from "./TextureAtlasCompiler";
+import { PNG }             from "pngjs";
 
-export interface AssetDefinition {
-    assetName: string;
-    assetType: AssetType;
-    path:      string;
+export class Asset {
+    parent:     string;
+    definition: AssetDefinition;
 
-    [key: string]: any;
-};
+    constructor(parent: string, definition: AssetDefinition) {
+        this.parent     = parent;
+        this.definition = definition;
+    }
 
-export interface AssetIndexDefinition extends AssetDefinition {
-    maintainer?: string;
-    creator?:    string;
-    patches?:    { [key: string]: AssetDefinition }[];
+    load(): Promise<void> {
+        return Promise.resolve();
+    }
+
+    populateAtlas(atlas: Map<string, PNG>): void {
+    }
+
+    populateVertexBuffer(atlas: { [image: string]: Readonly<Rectangle> }, textures: PNG[], buffer: number[]): void {
+        return undefined;
+    }
+
+    populateManifest(manifest: AssetManifest): void {
+        return undefined;
+    }
 }

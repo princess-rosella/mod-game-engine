@@ -32,13 +32,18 @@ import File    = require("vinyl");
 
 import { AssetRun } from "./AssetRun";
 
-class CompileStream extends stream.Duplex {
-    _previousRun     = new Map<string, AssetRun>();
-    _currentRun      = new Map<string, AssetRun>();
-    _currentPromises = new Array<Promise<void>>();
+class CompileSession {
+    previousRun     = new Map<string, AssetRun>();
+    currentRun      = new Map<string, AssetRun>();
+    currentPromises = new Array<Promise<void>>();
+}
 
-    constructor() {
+class CompileStream extends stream.Duplex {
+    session: CompileSession;
+
+    constructor(session: CompileSession) {
         super({ objectMode: true });
+        this.session = session;
     }
 
     _read() {
@@ -61,16 +66,17 @@ class CompileStream extends stream.Duplex {
             }
         }
 
-        const previousRun = this._previousRun.get(chunk.path);
+        const session     = this.session;
+        const previousRun = session.previousRun.get(chunk.path);
 
         if (previousRun) {
-            this._currentRun.set(chunk.path, previousRun);
-            this._currentPromises.push(previousRun.compile(true, this));
+            session.currentRun.set(chunk.path, previousRun);
+            session.currentPromises.push(previousRun.compile(true, this));
         }
         else {
             const newRun = new AssetRun(path.relative(process.cwd(), chunk.path));
-            this._currentRun.set(chunk.path, newRun);
-            this._currentPromises.push(newRun.compile(false, this));
+            session.currentRun.set(chunk.path, newRun);
+            session.currentPromises.push(newRun.compile(false, this));
         }
 
         if (callback)
@@ -85,16 +91,28 @@ class CompileStream extends stream.Duplex {
         else
             this._write(chunk, encoding, callback);
 
-        Promise.all(this._currentPromises).then(() => {
-            this._currentPromises = [];
-            this._previousRun     = this._currentRun;
-            this._currentRun      = new Map<string, AssetRun>();
-            this.emit("finish");
-            this.push(null);
-        });
+        const session = this.session;
+
+        Promise.all(session.currentPromises)
+            .then(() => {
+                session.currentPromises = [];
+                session.previousRun     = session.currentRun;
+                session.currentRun      = new Map<string, AssetRun>();
+                this.emit("finish");
+                this.push(null);
+            })
+            .catch(() => {
+                session.currentPromises = [];
+                session.previousRun     = session.currentRun;
+                session.currentRun      = new Map<string, AssetRun>();
+            });
     }
 };
 
-export default function(): NodeJS.ReadWriteStream {
-    return new CompileStream();
+export default function(): () => NodeJS.ReadWriteStream {
+    const session = new CompileSession();
+
+    return function () {
+        return new CompileStream(session);
+    }
 }

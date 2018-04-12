@@ -24,12 +24,13 @@
  * @LICENSE_HEADER_END@
  */
 
-const gulp    = require("gulp");
-const ts      = require("gulp-typescript");
-const path    = require("path");
-const merge   = require("merge2");
-const cwd     = process.cwd();
-const dirName = path.relative(cwd, __dirname);
+const gulp       = require("gulp");
+const ts         = require("gulp-typescript");
+const sourcemaps = require("gulp-sourcemaps");
+const path       = require("path");
+const merge      = require("merge2");
+const cwd        = process.cwd();
+const dirName    = path.relative(cwd, __dirname);
 
 const tsEngineSourceProject = ts.createProject(path.join(dirName, "tsconfig.json"), {
     outFile: path.join(cwd, "dist", "engine.js"),
@@ -41,20 +42,36 @@ const tsEngineToolsProject = ts.createProject(path.join(dirName, "tools.tsconfig
 });
 
 gulp.task("engine-src", function() {
-    const sources = gulp.src(path.join(dirName, "src/**/*.ts"));
-    const outputs = sources.pipe(tsEngineSourceProject());
+    function mapper(sourcePath, file) {
+        return path.join("..", dirName, sourcePath);
+    }
+
+    const outputs = gulp.src(path.join(dirName, "src/**/*.ts"))
+        .pipe(sourcemaps.init())
+        .pipe(tsEngineSourceProject());
+
+    const externals = gulp.src(path.join(dirName, "externals", "*.js"));
 
     return merge(
-        outputs.js.pipe(gulp.dest("dist")),
-        outputs.dts.pipe(gulp.dest("dist"))
-    );
+        outputs.js
+            .pipe(sourcemaps.mapSources(mapper))
+            .pipe(sourcemaps.write(".", { includeContent: false })),
+        outputs.dts,
+        externals
+    ).pipe(gulp.dest("dist"))
 });
 
 gulp.task("engine-tools", function() {
-    const sources = gulp.src(path.join(dirName, "tools/**/*.ts"));
-    const outputs = sources.pipe(tsEngineToolsProject());
+    function mapper(sourcePath, file) {
+        return path.join("../..", dirName, "tools", sourcePath);
+    }
 
-    return outputs.js.pipe(gulp.dest("dist/tools"));
+    return gulp.src(path.join(dirName, "tools/**/*.ts"))
+        .pipe(sourcemaps.init())
+        .pipe(tsEngineToolsProject()) 
+        .pipe(sourcemaps.mapSources(mapper))
+        .pipe(sourcemaps.write(".", { includeContent: false }))
+        .pipe(gulp.dest("dist/tools"));
 });
 
 gulp.task("engine", ["engine-src", "engine-tools"]);

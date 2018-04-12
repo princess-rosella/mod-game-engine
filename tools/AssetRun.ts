@@ -30,59 +30,33 @@ import crypto  = require("crypto");
 import fs      = require("fs");
 import path    = require("path");
 import stream  = require("stream");
-import yaml    = require("js-yaml");
 import File    = require("vinyl");
 
-import { AssetBase }             from "./AssetDefinition";
-import { AssetCell }             from "./AssetCell";
-import { AssetDefinition }       from "./AssetDefinition";
-import { AssetIndexDefinition }  from "./AssetDefinition";
-import { AssetManifest }         from "./AssetDefinition";
-import { AssetManifestTexture }  from "./AssetDefinition";
-import { AssetType }             from "./AssetDefinition";
-import { Minimatch as Glob }     from "minimatch";
-import { PopulateVertexOptions } from "./AssetDefinition";
-import { PNG }                   from "pngjs";
-import { Rectangle }             from "./TextureAtlasCompiler";
-import { TextureAtlasCompiler }  from "./TextureAtlasCompiler";
+import { Asset }                    from "./Asset";
+import { AssetCell }                from "./AssetCell";
+import { AssetCellTransform }       from "./AssetCell";
+import { AssetDefinition }          from "./AssetDefinition";
+import { AssetDefinitionReference } from "./AssetDefinitionReference";
+import { AssetFont }                from "./AssetFont";
+import { AssetIndexDefinition }     from "./AssetDefinition";
+import { AssetManifest }            from "./AssetManifest";
+import { AssetManifestTexture }     from "./AssetManifest";
+import { AssetType }                from "./AssetDefinition";
+import { Minimatch as Glob }        from "minimatch";
+import { PNG }                      from "pngjs";
+import { TextureAtlasCompiler }     from "./TextureAtlasCompiler";
 
+import { parseAssetDefinitionFile, convertDashToCamel }    from "./AssetDefinitionParser";
 import { removeKnownExtensionsFromPath, assetTypeForPath } from "./AssetFileExtensions";
-import { readTextFile, walk, WalkOptions }                 from "./AsyncFile";
+import { serializeAssetManifest }                          from "./AssetManifest";
+import { walk, WalkOptions }                               from "./AsyncFile";
 import { makeRe as globToRegex }                           from "minimatch";
 
 function sorted<T>(items: IterableIterator<T>): Array<T> {
     return new Array(...items).sort();
 }
 
-export class AssetLoop extends AssetBase {
-}
-
-export class AssetTransform extends AssetBase {
-    reference!: AssetBase;
-
-    async load(implementations: Map<string, AssetBase>): Promise<void> {
-        let reference = <string>this.definition["reference"];
-        if (!reference)
-            return;
-
-        reference      = path.normalize(path.join(path.dirname(this.definition.assetName), reference));
-        this.reference = implementations.get(reference)!;
-    }
-
-    populateVertexBuffer(atlas: { [image: string]: Readonly<Rectangle> }, textures: PNG[], buffer: number[], options: PopulateVertexOptions) {
-        const newOptions: PopulateVertexOptions = {};
-
-        if (this.definition["transform"] === "mirror-horizontal")
-            newOptions.flipHorizontal = true;
-        else if (this.definition["transform"] === "mirror-vertical")
-            newOptions.flipHorizontal = true;
-
-        newOptions.pivotX = this.definition["pivotX"];
-        newOptions.pivotY = this.definition["pivotY"];
-
-        if (this.reference)
-            this.reference.populateVertexBuffer(atlas, textures, buffer, newOptions);
-    }
+export class AssetLoop extends Asset {
 }
 
 const atlasCompiler = new TextureAtlasCompiler();
@@ -129,24 +103,9 @@ export class AssetRun {
         return true;
     }
 
-    private async loadYamlDefinition(file: string): Promise<AssetDefinition> {
-        const yamlData = <AssetDefinition>yaml.load(await readTextFile(file));
-        if (!yamlData)
-            throw new Error("Found an 'undefined'. Expected a map");
-
-        if (Array.isArray(yamlData))
-            throw new Error("Found an array. Expected a map");
-
-        const yamlType = typeof yamlData;
-        if (yamlType !== "object")
-            throw new Error(`Found an ${yamlType}. Expected a map`);
-
-        return yamlData;
-    }
-
     private applyPatch(definition: AssetDefinition, patch: AssetDefinition) {
         for (const key in patch)
-            definition[key] = patch[key];
+            definition[convertDashToCamel(key)] = patch[key];
     }
 
     private enumerateAssetMatchingPattern(pattern: string, definitions: Map<string, AssetDefinition>, callback: (definition: AssetDefinition) => void) {
@@ -158,7 +117,7 @@ export class AssetRun {
         }
     }
 
-    private async createDefinitionForAssets(files: Map<string, fs.Stats>, folders: Map<string, string[]>, assets: Map<string, AssetDefinition>): Promise<void> {
+    private async createDefinitionForAssets(files: Map<string, fs.Stats>, folders: Map<string, string[]>, assets: Map<string, AssetDefinition>, references: Set<AssetDefinitionReference>): Promise<void> {
         for (const file of files.keys()) {
             if (path.basename(file) === "index.yaml")
                 continue;
@@ -183,7 +142,7 @@ export class AssetRun {
 
             if (file.endsWith(".yaml")) {
                 try {
-                    this.applyPatch(assetDefinition, await this.loadYamlDefinition(path.join(this.path, file)))
+                    this.applyPatch(assetDefinition, await parseAssetDefinitionFile(path.join(this.path, file), path.dirname(file), references));
                 }
                 catch (e) {
                     const error = new Error(`Failed to parse ${file}: ${e}`);
@@ -209,7 +168,7 @@ export class AssetRun {
             const indexFile = path.join(folder, "index.yaml");
             if (files.has(indexFile)) {
                 try {
-                    const indexDefinition = <AssetIndexDefinition>await this.loadYamlDefinition(path.join(this.path, indexFile));
+                    const indexDefinition = <AssetIndexDefinition>await parseAssetDefinitionFile(path.join(this.path, indexFile), path.basename(indexFile), references);
                     const patches = indexDefinition.patches;
 
                     if (patches) {
@@ -238,32 +197,41 @@ export class AssetRun {
             if (assetType)
                 assets.set(assetName, assetDefinition);
         }
+
+        for (const reference of references)
+            reference.definition = assets.get(reference.path);
     }
 
-    private createImplementation(definition: AssetDefinition): AssetBase {
+    private createImplementation(definition: AssetDefinition): Asset {
         if (definition.assetType === AssetType.Cell)
             return new AssetCell(this.path, definition);
 
         if (definition.assetType === AssetType.Loop)
             return new AssetLoop(this.path, definition);
 
-        if (definition.assetType === AssetType.Transform)
-            return new AssetTransform(this.path, definition);
+        if (definition.assetType === AssetType.Font)
+            return new AssetFont(this.path, definition);
+            
+        if (definition.assetType === AssetType.CellTransform)
+            return new AssetCellTransform(this.path, definition);
 
         this.errors.push(new Error(`Invalid asset type: ${definition.assetType}`));
-        return new AssetBase(this.path, definition);
+        return new Asset(this.path, definition);
     }
 
-    private createImplementations(definitions: Map<string, AssetDefinition>, implementations: Map<string, AssetBase>) {
+    private createImplementations(definitions: Map<string, AssetDefinition>, implementations: Map<string, Asset>, references: Set<AssetDefinitionReference>) {
         for (const [name, definition] of definitions)
             implementations.set(name, this.createImplementation(definition));
+
+        for (const reference of references)
+            reference.object = implementations.get(reference.path);
     }
 
-    private loadImplementations(definitions: Map<string, AssetDefinition>, implementations: Map<string, AssetBase>): Promise<void[]> {
+    private loadImplementations(implementations: Map<string, Asset>): Promise<void[]> {
         let pending = new Array<Promise<void>>();
 
         for (const implementation of implementations.values())
-            pending.push(implementation.load(implementations));
+            pending.push(implementation.load());
 
         return Promise.all(pending);
     }
@@ -278,14 +246,18 @@ export class AssetRun {
         this.errors = [];
 
         const assetDefinitions    = new Map<string, AssetDefinition>();
-        const assetImplmentations = new Map<string, AssetBase>();
+        const assetImplmentations = new Map<string, Asset>();
+        const assetReferences     = new Set<AssetDefinitionReference>();
 
-        await this.createDefinitionForAssets(files, folders, assetDefinitions);
-        this.createImplementations(assetDefinitions, assetImplmentations);
-        await this.loadImplementations(assetDefinitions, assetImplmentations);
+        await this.createDefinitionForAssets(files, folders, assetDefinitions, assetReferences);
+        this.createImplementations(assetDefinitions, assetImplmentations, assetReferences);
+        await this.loadImplementations(assetImplmentations);
 
         const atlasFiles = new Map<string, PNG>();
-        const manifest   = <AssetManifest>{};
+        const manifest   = <AssetManifest>{
+            cells:   {},
+            objects: {},
+        };
 
         for (const assetImplementation of assetImplmentations.values())
             assetImplementation.populateAtlas(atlasFiles);
@@ -328,7 +300,7 @@ export class AssetRun {
             const vertexBuffer: number[] = [];
 
             for (const assetImplementation of assetImplmentations.values())
-                assetImplementation.populateVertexBuffer(atlas.images, atlasTextures, vertexBuffer, {});
+                assetImplementation.populateVertexBuffer(atlas.images, atlasTextures, vertexBuffer);
 
             const verticesFileName = `${baseName}.vertices.data`;
 
@@ -346,13 +318,16 @@ export class AssetRun {
             };
         }
 
+        for (const assetImplementation of assetImplmentations.values())
+            assetImplementation.populateManifest(manifest);
+
         duplex.push(new File({
             cwd:      process.cwd(),
             base:     process.cwd(),
             path:     path.join(process.cwd(), `${baseName}.json`),
-            contents: Buffer.from(JSON.stringify(manifest, undefined, 2), "utf-8")
+            contents: Buffer.from(serializeAssetManifest(manifest), "utf-8")
         }));
-    
+
         if (this.errors.length > 0)
             throw this.errors;
     }

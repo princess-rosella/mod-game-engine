@@ -1,0 +1,19 @@
+<html>
+    <head>
+        <title><!-- @echo TITLE --></title>
+        <script src="require.js" defer></script>
+        <script src="engine.js" defer></script>
+        <script src="<!-- @echo GAMEID -->.js" defer></script>
+        <script>
+            function gameLoad() {
+                console.info("Document loaded");
+                requirejs(["Main"], (main) => {
+                    console.info("Modules initialized");
+                });
+            }
+        </script>
+    </head>
+    <body onload="gameLoad()">
+        <canvas id="screen"></canvas>
+    </body>
+</html>

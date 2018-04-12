@@ -33,6 +33,7 @@ import { AssetType } from "./AssetDefinition";
 const knownExtensions = [
     // Composed extensions
     ".ega.json",
+    ".font.json",
     ".transform.yaml",
 
     // Simple ones.
@@ -68,11 +69,11 @@ export function assetTypeForPath(pathname: string): AssetType | undefined {
     if (isImage(pathname))
         return AssetType.Cell;
 
+    if (pathname.endsWith(".font.json"))
+        return AssetType.Font;
+
     if (pathname.endsWith(".loop"))
         return AssetType.Loop;
-
-    if (pathname.endsWith(".transform.yaml"))
-        return AssetType.Transform;
 
     if (pathname.endsWith(".yaml"))
         return AssetType.Object;

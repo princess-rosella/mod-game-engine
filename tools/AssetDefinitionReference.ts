@@ -24,24 +24,15 @@
  * @LICENSE_HEADER_END@
  */
 
-export const enum AssetType {
-    Cell          = "cell",
-    CellTransform = "cell-transform",
-    Font          = "font",
-    Loop          = "loop",
-    Object        = "object",
-}
+import { Asset }           from "./Asset";
+import { AssetDefinition } from "./AssetDefinition";
 
-export interface AssetDefinition {
-    assetName: string;
-    assetType: AssetType;
-    path:      string;
+export class AssetDefinitionReference {
+    readonly path: string;
+    definition?:   AssetDefinition;
+    object?:       Asset;
 
-    [key: string]: any;
-};
-
-export interface AssetIndexDefinition extends AssetDefinition {
-    maintainer?: string;
-    creator?:    string;
-    patches?:    { [key: string]: AssetDefinition }[];
+    constructor(path: string) {
+        this.path = path;
+    }
 }

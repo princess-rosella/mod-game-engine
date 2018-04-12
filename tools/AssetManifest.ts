@@ -24,24 +24,36 @@
  * @LICENSE_HEADER_END@
  */
 
-export const enum AssetType {
-    Cell          = "cell",
-    CellTransform = "cell-transform",
-    Font          = "font",
-    Loop          = "loop",
-    Object        = "object",
+export interface AssetManifestTexture {
+    file:   string;
+    width:  number;
+    height: number;
+    grey?:  boolean;
+    size:   number;
 }
 
-export interface AssetDefinition {
-    assetName: string;
-    assetType: AssetType;
-    path:      string;
+export interface AssetManifestVertices {
+    file: string;
+    size: number;
+}
 
-    [key: string]: any;
-};
+export interface AssetManifestCellBoundingBox {
+    left:   number;
+    right:  number;
+    top:    number;
+    bottom: number;
+}
 
-export interface AssetIndexDefinition extends AssetDefinition {
-    maintainer?: string;
-    creator?:    string;
-    patches?:    { [key: string]: AssetDefinition }[];
+// texID, vertexStart, vertexEnd, boundingBox.left, boundingBox.top, boundingBox.right, boundingBox.bottom
+export type AssetManifestCell = [number, number, number, number, number, number, number];
+
+export interface AssetManifest {
+    textures?: AssetManifestTexture[];
+    vertices?: AssetManifestVertices;
+    cells:     { [key: string]: AssetManifestCell }
+    objects:   { [key: string]: { [key: string]: any }};
+}
+
+export function serializeAssetManifest(manifest: AssetManifest): string {
+    return JSON.stringify(manifest, undefined, 2);
 }

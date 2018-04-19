@@ -51,6 +51,35 @@ export const EGADefaultPalette: { [key: string]: number[] } = {
     "F": parseEGAHex("FFFFFF"),
 }
 
+export function convertMonochromeEGAObjectToPNG(mono: string[]): PNG {
+    if (mono.length <= 0)
+        return new PNG({ height: 0, width: 0 });
+
+    const png = new PNG({ height: mono.length, width: mono[0].length });
+
+    let index = 0;
+
+    for (const line of mono) {
+        for (const code of line) {
+            let color: number = 0;
+            let alpha: number = 255;
+
+            if (code === " ")
+                alpha = 0;
+            else
+                color = (parseInt(code, 16) / 15) * 255;
+
+            png.data[index + 0] = color;
+            png.data[index + 1] = color;
+            png.data[index + 2] = color;
+            png.data[index + 3] = alpha;
+            index += 4;
+        }
+    }
+
+    return png;
+}
+
 export function convertEGAObjectToPNG(ega: string[]): PNG {
     if (ega.length <= 0)
         return new PNG({ height: 0, width: 0 });

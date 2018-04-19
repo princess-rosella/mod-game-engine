@@ -159,6 +159,9 @@ export class TextureAtlasCompiler<T extends IImage> {
             }
 
             function pass3(rect: Rectangle, spacingWidth: number, spacingHeight: number, needWidth: number, needHeight: number) {
+                if ((rect.width <= needWidth) || (rect.height <= needHeight))
+                    return false;
+                
                 output.set(imageName, { left: rect.left + spacingWidth, top: rect.top + spacingHeight, width: image.width, height: image.height, part: rect.part });
                 rectangles.push({ left: rect.left + needWidth, top: rect.top, width: rect.width - needWidth, height: needHeight, part: rect.part });
                 rect.top    += needHeight;
@@ -196,7 +199,7 @@ export class TextureAtlasCompiler<T extends IImage> {
                         return null;
                     }
 
-                    rectangles.push({ left: 0, top: 0, width: 0, height: 0, part: ++part });
+                    rectangles.push({ left: 0, top: 0, width: width, height: height, part: ++part });
                     continue;
                 }
 

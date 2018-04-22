@@ -173,7 +173,7 @@ export class Quartz implements IQuartz {
 
         let lastCounter = 0;
 
-        this._timer = setInterval(() => {
+        this._timer = <number><any>setInterval(() => {
             if (this._hibernating)
                 return;
 

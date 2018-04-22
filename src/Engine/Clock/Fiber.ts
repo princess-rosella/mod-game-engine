@@ -38,7 +38,7 @@ export class Fiber implements IFiber {
     start(): void {
     }
 
-    tick(counter: number, time: number, skip: boolean): void {
+    tick(): void {
         this.generator.next();
     }
 

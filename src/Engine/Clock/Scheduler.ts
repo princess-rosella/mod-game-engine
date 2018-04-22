@@ -30,6 +30,11 @@ import { Fiber } from "./Fiber";
 
 export interface IScheduler {
     frequency: Fraction;
+
+    readonly currentFrameCounter: number;
+    readonly currentFrameTime: number;
+    readonly currentFrameSkip: boolean;
+
     start(): void;
     stop(): void;
 
@@ -47,12 +52,16 @@ export interface IFiber {
     readonly name: string;
 
     start(): void;
-    tick(counter: number, time: number, skip: boolean): void;
+    tick(): void;
     stop(): void;
 }
 
 export class Scheduler implements IScheduler {
     readonly quartz: IQuartz;
+
+    currentFrameCounter = -1;
+    currentFrameTime    = -1;
+    currentFrameSkip    = false;
 
     protected _mode          = "default";
     protected _fibersByMode  = new Map<string, Set<IFiber>>();
@@ -121,8 +130,12 @@ export class Scheduler implements IScheduler {
         if (this._fibersToCheck.size !== 0)
             this.dispatchPendingSignalsToFibers();
 
+        this.currentFrameCounter = counter;
+        this.currentFrameTime    = time;
+        this.currentFrameSkip    = skip;
+
         for (const fiber of this._fibers)
-            fiber.tick(counter, time, skip);
+            fiber.tick();
     }
 
     protected _quartzStop() {

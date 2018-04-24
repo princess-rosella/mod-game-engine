@@ -63,7 +63,7 @@ export class Quartz implements IQuartz {
 
     private running = 0;
 
-    delegate!: IQuartzDelegate;
+    delegate: IQuartzDelegate;
 
     constructor() {
         this._tick      = this._tick.bind(this);
@@ -73,6 +73,11 @@ export class Quartz implements IQuartz {
         });
 
         this._frequencyLambda = this.createFrequencyLambda(this._frequency);
+        this.delegate = {
+            start: function() {},
+            stop:  function() {},
+            tick:  function(counter, time, skip) {},
+        };
     }
 
     get frequency() {
@@ -107,9 +112,7 @@ export class Quartz implements IQuartz {
             this._token         = raf(this._tick);
             this._hibernating   = false;
 
-            if (delegate)
-                delegate.start();
-
+            delegate.start();
             return;
         }
 
@@ -129,7 +132,7 @@ export class Quartz implements IQuartz {
         let nextTime   = initialNextTime;
 
         if ((currentTime - initialNextTime) > 500.0) {
-            if (delegate && !this._hibernating)
+            if (!this._hibernating)
                 delegate.stop();
 
             this._referenceTime = 0.0;
@@ -147,9 +150,6 @@ export class Quartz implements IQuartz {
         this._counter  = counter;
         this._nextTime = nextTime;
         this._token    = raf(this._tick);
-
-        if (!delegate)
-            return;
 
         if (frameCount === 1) {
             delegate.tick(initialCounter, initialNextTime - referenceTime, false);
@@ -179,7 +179,7 @@ export class Quartz implements IQuartz {
 
             const currentCount = this._counter;
 
-            if (currentCount === lastCounter && this.delegate) {
+            if (currentCount === lastCounter) {
                 this.delegate.stop();
                 this._hibernating   = true;
                 this._referenceTime = 0.0;
@@ -212,7 +212,6 @@ export class Quartz implements IQuartz {
             this._timer = 0;
         }
 
-        if (this.delegate)
-            this.delegate.stop();
+        this.delegate.stop();
     }
 }

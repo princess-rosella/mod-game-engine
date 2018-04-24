@@ -38,8 +38,8 @@ export class Fiber implements IFiber {
     start(): void {
     }
 
-    tick(): void {
-        this.generator.next();
+    tick(): boolean {
+        return !this.generator.next().done;
     }
 
     stop(): void {

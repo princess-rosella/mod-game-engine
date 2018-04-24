@@ -48,16 +48,22 @@ export interface IScheduler {
     addGenerator(name: string, generator: Generator, modes: Set<string>): IFiber;
 }
 
+export interface ISchedulerDelegate {
+    preTick(): void;
+    postTick(): void;
+}
+
 export interface IFiber {
     readonly name: string;
 
     start(): void;
-    tick(): void;
+    tick(): boolean;
     stop(): void;
 }
 
 export class Scheduler implements IScheduler {
-    readonly quartz: IQuartz;
+    readonly quartz:   IQuartz;
+    readonly delegate: ISchedulerDelegate;
 
     currentFrameCounter = -1;
     currentFrameTime    = -1;
@@ -75,6 +81,11 @@ export class Scheduler implements IScheduler {
             start: this._quartzStart.bind(this),
             tick:  this._quartzTick .bind(this),
             stop:  this._quartzStop .bind(this),
+        };
+
+        this.delegate = {
+            preTick:  function() {},
+            postTick: function() {},
         };
 
         this._fibersByMode.set(this._mode, this._fibers);
@@ -134,8 +145,24 @@ export class Scheduler implements IScheduler {
         this.currentFrameTime    = time;
         this.currentFrameSkip    = skip;
 
-        for (const fiber of this._fibers)
-            fiber.tick();
+        const delegate = this.delegate;
+        let fibersToRemove: Set<IFiber> | null = null;
+
+        delegate.preTick();
+
+        for (const fiber of this._fibers) {
+            if (!fiber.tick()) {
+                if (!fibersToRemove)
+                    fibersToRemove = new Set<Fiber>();
+
+                fibersToRemove!.add(fiber);
+            }
+        }
+
+        delegate.postTick();
+
+        if (fibersToRemove)
+            this.removeFibersInSet(fibersToRemove);
     }
 
     protected _quartzStop() {
@@ -221,9 +248,13 @@ export class Scheduler implements IScheduler {
                 fibersToRemove.add(fiber);
         }
 
+        return this.removeFibersInSet(fibersToRemove);
+    }
+
+    removeFibersInSet(fibersToRemove: Set<IFiber>): number {
         if (fibersToRemove.size === 0)
             return 0;
-
+        
         for (const mode of this._fibersByMode.values()) {
             for (const fiber of fibersToRemove) {
                 mode.delete(fiber);

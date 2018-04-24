@@ -38,7 +38,7 @@ export const enum DeviceType {
     TV      = "tv"
 }
 
-const detectDeviceClass = function(): DeviceType {
+const detectDeviceType = function(): DeviceType {
     const userAgent = navigator.userAgent;
 
     if (/Android/g.test(userAgent)) {
@@ -69,12 +69,14 @@ let keyboardEventHandler: ((ev: KeyboardEvent) => boolean) | undefined;
 export class Device {
     readonly keyboardPresent: boolean;
     readonly mousePresent:    boolean;
-    readonly deviceClass:     DeviceType;
+    readonly touchPresent:    boolean;
+    readonly deviceType:      DeviceType;
 
     constructor() {
-        this.deviceClass     = detectDeviceClass();
-        this.keyboardPresent = this.deviceClass === "desktop";
-        this.mousePresent    = this.deviceClass === "desktop";
+        this.deviceType      = detectDeviceType();
+        this.keyboardPresent = this.deviceType === DeviceType.Desktop;
+        this.mousePresent    = this.deviceType === DeviceType.Desktop;
+        this.touchPresent    = this.deviceType === DeviceType.Tablet || this.deviceType === DeviceType.Phone;
     }
 
     addKeyboardStatusListener(listener: DeviceKeyboardStatusListener) {
@@ -161,9 +163,5 @@ export class Device {
         if (!currentDevice)
             currentDevice = new Device();
         return currentDevice;
-    }
-
-    get supportsShadowRoot(): boolean {
-        return !!(HTMLElement.prototype.attachShadow);
     }
 }

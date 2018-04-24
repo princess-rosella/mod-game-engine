@@ -24,7 +24,7 @@
  * @LICENSE_HEADER_END@
  */
 
-import { Rectangle, Size } from "../Types";
+import { Rectangle, Size, Fraction } from "../Types";
 import { IReadonlyMatrix3, IVersionnedMatrix3, IMatrix3 } from "../Math/Matrix3";
 
 export const enum ScreenType {
@@ -155,6 +155,12 @@ export interface Features {
      * It makes sure that pixels are not fractional, ie. 1x1, 2x2, 3x3.
      */
     keepPixelRatio?: boolean;
+
+    /**
+     * By default, pixel are square. But in the case some old hardware is getting emulated, like CGA or EGA
+     * graphics, their pixel ratio is slightly taller than their width.
+     */
+    pixelRatio?: Fraction;
 }
 
 export const enum ElementType {

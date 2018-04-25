@@ -275,5 +275,6 @@ export class ScreenPhysical extends Screen implements IScreenWebGL {
 
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
         this.layer.draw(this.surface);
+        this.dirty = false;
     }
 }

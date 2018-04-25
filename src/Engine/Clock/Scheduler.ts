@@ -28,8 +28,14 @@ import { Quartz, IQuartz } from "./Quartz";
 import { Fraction } from "../Types";
 import { Fiber } from "./Fiber";
 
+export interface ISchedulerDelegate {
+    preTick(): void;
+    postTick(): void;
+}
+
 export interface IScheduler {
     frequency: Fraction;
+    delegate: ISchedulerDelegate;
 
     readonly currentFrameCounter: number;
     readonly currentFrameTime: number;
@@ -48,11 +54,6 @@ export interface IScheduler {
     addGenerator(name: string, generator: Generator, modes: Set<string>): IFiber;
 }
 
-export interface ISchedulerDelegate {
-    preTick(): void;
-    postTick(): void;
-}
-
 export interface IFiber {
     readonly name: string;
 
@@ -63,7 +64,7 @@ export interface IFiber {
 
 export class Scheduler implements IScheduler {
     readonly quartz:   IQuartz;
-    readonly delegate: ISchedulerDelegate;
+    delegate: ISchedulerDelegate;
 
     currentFrameCounter = -1;
     currentFrameTime    = -1;
@@ -254,7 +255,7 @@ export class Scheduler implements IScheduler {
     removeFibersInSet(fibersToRemove: Set<IFiber>): number {
         if (fibersToRemove.size === 0)
             return 0;
-        
+
         for (const mode of this._fibersByMode.values()) {
             for (const fiber of fibersToRemove) {
                 mode.delete(fiber);

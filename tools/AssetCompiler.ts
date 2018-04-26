@@ -31,6 +31,7 @@ import stream  = require("stream");
 import File    = require("vinyl");
 
 import { AssetRun } from "./AssetRun";
+import { removeKnownExtensionsFromPath } from "./AssetFileExtensions";
 
 class CompileSession {
     previousRun     = new Map<string, AssetRun>();
@@ -83,6 +84,28 @@ class CompileStream extends stream.Duplex {
             callback();
     }
 
+    private compileGlobalManifest(session: CompileSession) {
+        const globalManifest: { [asset: string]: { [file: string]: number } } = {};
+
+        for (const [name, asset] of session.currentRun) {
+            const assetName = removeKnownExtensionsFromPath(path.basename(name))
+            const files: { [file: string]: number } =  {};
+            for (const [file, size] of asset.generatedFiles)
+                files[file] = size;
+
+            globalManifest[assetName] = files;
+        }
+
+        const globalManifestBuffer = Buffer.from(JSON.stringify(globalManifest, undefined, 2), "utf-8");
+
+        this.push(new File({
+            cwd:      process.cwd(),
+            base:     process.cwd(),
+            path:     path.join(process.cwd(), "Manifest.json"),
+            contents: globalManifestBuffer
+        }));
+    }
+
     end(chunk: any, encoding?: any, callback?: any): void {
         if (typeof chunk === 'function')
             this._write(null, null, chunk);
@@ -95,6 +118,8 @@ class CompileStream extends stream.Duplex {
 
         Promise.all(session.currentPromises)
             .then(() => {
+                this.compileGlobalManifest(session);
+
                 session.currentPromises = [];
                 session.previousRun     = session.currentRun;
                 session.currentRun      = new Map<string, AssetRun>();

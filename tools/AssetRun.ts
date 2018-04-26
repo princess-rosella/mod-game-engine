@@ -65,6 +65,7 @@ export class AssetRun {
     path:   string;
     hash:   string  = "";
     errors: Error[] = [];
+    generatedFiles = new Map<string, number>();
 
     constructor(path: string) {
         this.path = path;
@@ -211,7 +212,7 @@ export class AssetRun {
 
         if (definition.assetType === AssetType.Font)
             return new AssetFont(this.path, definition);
-            
+
         if (definition.assetType === AssetType.CellTransform)
             return new AssetCellTransform(this.path, definition);
 
@@ -243,6 +244,7 @@ export class AssetRun {
         if (!(await this.computeHashFileAndFolders(files, folders)))
             return;
 
+        this.generatedFiles.clear();
         this.errors = [];
 
         const assetDefinitions    = new Map<string, AssetDefinition>();
@@ -295,6 +297,8 @@ export class AssetRun {
                     path:     path.join(process.cwd(), texFileName),
                     contents: pngBuffer
                 }));
+
+                this.generatedFiles.set(texFileName, pngBuffer.length);
             }
 
             const vertexBuffer: number[] = [];
@@ -303,13 +307,16 @@ export class AssetRun {
                 assetImplementation.populateVertexBuffer(atlas.images, atlasTextures, vertexBuffer);
 
             const verticesFileName = `${baseName}.vertices.data`;
+            const verticesBuffer   = Buffer.from(Float32Array.from(vertexBuffer).buffer);
 
             duplex.push(new File({
                 cwd:      process.cwd(),
                 base:     process.cwd(),
                 path:     path.join(process.cwd(), verticesFileName),
-                contents: Buffer.from(Float32Array.from(vertexBuffer).buffer)
+                contents: verticesBuffer
             }));
+
+            this.generatedFiles.set(verticesFileName, verticesBuffer.length);
 
             manifest.textures = manifestTextures;
             manifest.vertices = {
@@ -321,12 +328,16 @@ export class AssetRun {
         for (const assetImplementation of assetImplmentations.values())
             assetImplementation.populateManifest(manifest);
 
+        const manifestBuffer = Buffer.from(serializeAssetManifest(manifest), "utf-8");
+
         duplex.push(new File({
             cwd:      process.cwd(),
             base:     process.cwd(),
             path:     path.join(process.cwd(), `${baseName}.json`),
-            contents: Buffer.from(serializeAssetManifest(manifest), "utf-8")
+            contents: manifestBuffer
         }));
+
+        this.generatedFiles.set(`${baseName}.json`, manifestBuffer.length);
 
         if (this.errors.length > 0)
             throw this.errors;

@@ -25,6 +25,7 @@
  */
 
 import { IScreenWebGL } from "../Screen/WebGL/Interfaces";
+import { ICell } from "../Screen/Interfaces";
 
 export interface AssetManifestTexture {
     file:   string;
@@ -57,4 +58,17 @@ export interface AssetManifest {
 }
 
 export class Asset {
+    objects: Map<string, any>;
+
+    constructor(objects: Map<string, any>) {
+        this.objects = objects;
+    }
+
+    cell(name: string): ICell {
+        const cell = <ICell>this.objects.get(name);
+        if (!cell)
+            throw new Error(`Invalid cell ${name}`);
+
+        return cell;
+    }
 }

@@ -24,23 +24,36 @@
  * @LICENSE_HEADER_END@
  */
 
-import { AssetManifest }     from "./Asset";
-import { IScreen, ICell }    from "../Screen/Interfaces";
-import { IScreenWebGL }      from "../Screen/WebGL/Interfaces";
-import { Cell as CellWebGL } from "../Screen/WebGL/Cell";
+import { AssetManifest, Asset } from "./Asset";
+import { IScreen, ICell }       from "../Screen/Interfaces";
+import { IScreenWebGL }         from "../Screen/WebGL/Interfaces";
+import { Cell as CellWebGL }    from "../Screen/WebGL/Cell";
 
 export interface GameManifest {
     [asset: string]: { [file: string]: number };
 }
 
-function loadImage(src: string, width?: number, height?: number): Promise<HTMLImageElement> {
+function loadImage(gl: WebGLRenderingContext, src: string, width?: number, height?: number): Promise<WebGLTexture> {
     return new Promise(function(resolve, reject) {
         const image = new Image(width, height);
 
         image.onload = function() {
             image.onload  = null;
             image.onerror = null;
-            resolve(image);
+
+            const tex = gl.createTexture();
+            if (!tex) {
+                reject(new Error("Failed to create WebGL textures"));
+                return;
+            }
+
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            resolve(tex);
         };
 
         image.onerror = function(ev) {
@@ -53,9 +66,17 @@ function loadImage(src: string, width?: number, height?: number): Promise<HTMLIm
     });
 }
 
-async function loadVertices(src: string): Promise<Float32Array> {
+async function loadVertices(gl: WebGLRenderingContext, src: string): Promise<WebGLBuffer> {
     const response = await fetch(src);
-    return new Float32Array(await response.arrayBuffer());
+    const vertices = new Float32Array(await response.arrayBuffer());
+    const buffer   = gl.createBuffer();
+
+    if (!buffer)
+        throw new Error("Failed to create vertices buffer");
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+    return buffer;
 }
 
 async function loadBuffer(src: string): Promise<ArrayBuffer> {
@@ -68,13 +89,13 @@ async function loadJSON<T>(src: string): Promise<T> {
     return <T>await response.json();
 }
 
-function loadGeneric(src: string): Promise<any> {
+function loadGeneric(gl: WebGLRenderingContext, src: string): Promise<any> {
     if (src.endsWith(".json"))
         return loadJSON<any>(src);
     else if (src.endsWith(".png"))
-        return loadImage(src);
+        return loadImage(gl, src);
     else if (src.endsWith(".vertices.data"))
-        return loadVertices(src);
+        return loadVertices(gl, src);
     else
         return loadBuffer(src);
 }
@@ -109,55 +130,37 @@ export class Game {
 
         const promises = new Array<Promise<any>>();
         const files    = new Map<string, any>();
+        const screenGL = <IScreenWebGL>this.screen;
+        const gl       = screenGL.context;
 
         for (const file in this.manifest[name]) {
-            promises.push(loadGeneric(this.baseURL + file).then((value) => {
+            promises.push(loadGeneric(gl, this.baseURL + file).then((value) => {
                 files.set(file, value);
             }));
         }
 
         await Promise.all(promises);
 
-        const screenGL = <IScreenWebGL>this.screen;
-        const gl       = screenGL.context;
-
         let   manifest = <AssetManifest>files.get(`${name}.json`)!;
         let   vertices: WebGLBuffer | null = null;
         const textures: WebGLTexture[]     = [];
 
-        if (manifest.vertices) {
-            vertices = gl.createBuffer();
-            if (!vertices)
-                throw new Error("Failed to create vertices buffer");
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
-            gl.bufferData(gl.ARRAY_BUFFER, <Float32Array>files.get(manifest.vertices.file)!, gl.STATIC_DRAW);
-        }
+        if (manifest.vertices)
+            vertices = files.get(manifest.vertices.file);
 
         if (manifest.textures) {
-            for (const textureDefinition of manifest.textures) {
-                const tex = gl.createTexture();
-                if (!tex)
-                    throw new Error("Failed to create WebGL textures");
-
-                gl.bindTexture(gl.TEXTURE_2D, tex);
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, files.get(textureDefinition.file));
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-                textures.push(tex);
-            }
+            for (const textureDefinition of manifest.textures)
+                textures.push(files.get(textureDefinition.file));
         }
 
-        const cells = new Map<string, ICell>();
+        const objects = new Map<string, any>();
 
         for (const cellName in manifest.cells) {
             const [texID, vertexStart, vertexEnd, left, top, right, bottom] = manifest.cells[cellName];
             const cell = new CellWebGL(textures[texID], vertices!, vertexStart, vertexEnd, { x: left, y: top, width: right - left, height: bottom - top }, 0);
-            cells.set(cellName, cell);
+            objects.set(cellName, cell);
         }
 
-        throw new Error();
+        return new Asset(objects);
     }
 }

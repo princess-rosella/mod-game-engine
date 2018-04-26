@@ -24,8 +24,9 @@
  * @LICENSE_HEADER_END@
  */
 
-import { ScreenPhysical } from "./WebGL/ScreenPhysical";
+import { ScreenPhysical }    from "./WebGL/ScreenPhysical";
 import { Features, IScreen } from "./Interfaces";
+import { Screen }            from "./Screen";
 
 export class ScreenFactory {
     static create(canvas: HTMLCanvasElement, features: Features): IScreen {
@@ -39,5 +40,30 @@ export class ScreenFactory {
             throw new Error("WebGL unsupported");
 
         return new ScreenPhysical(canvas, features, <WebGLRenderingContext>context)
+    }
+
+    static createFullwindow(canvasID: string, features: Features): IScreen {
+        const screenElement = <HTMLCanvasElement>document.getElementById(canvasID);
+        if (!screenElement)
+            throw new Error("Sreen element not found");
+    
+        if (!(screenElement instanceof HTMLCanvasElement))
+            throw new Error("Screen element is not a <canvas>");
+    
+        function updateScreenElementSize() {
+            screenElement.width  = window.innerWidth;
+            screenElement.height = window.innerHeight;
+        }
+    
+        updateScreenElementSize();
+    
+        const screen = <Screen><any>ScreenFactory.create(screenElement, features);
+    
+        window.addEventListener("resize", (ev) => {
+            updateScreenElementSize();
+            screen.sizeMightHaveChanged();
+        });
+
+        return screen;
     }
 }

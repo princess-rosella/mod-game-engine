@@ -37,6 +37,8 @@ const cellNumberOfFloatPerVertex = 4;
 const cellNumberOfVertex         = 6;
 
 const floor = Math.floor;
+const min   = Math.min;
+const max   = Math.max;
 
 export class ScreenPhysical extends Screen implements IScreenWebGL {
     context: WebGLRenderingContext;
@@ -85,7 +87,7 @@ export class ScreenPhysical extends Screen implements IScreenWebGL {
         const canvasRatio     = this.size.width  / this.size.height;
 
         if (this.features.keepPixelRatio) {
-            const scale          = Math.max(1, Math.floor(this.size.height / resolution.height), Math.round(this.size.width / resolution.width));
+            const scale          = max(1, min(floor(this.size.height / resolution.height), floor(this.size.width / resolution.width)));
             const scaledWidth    = resolution.width  * scale;
             const scaledHeight   = resolution.height * scale;
             const blackBarWidth  = (this.size.width  - scaledWidth)  / 2 / scale;

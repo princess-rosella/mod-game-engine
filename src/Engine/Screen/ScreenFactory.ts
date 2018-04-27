@@ -50,9 +50,13 @@ export class ScreenFactory {
         if (!(screenElement instanceof HTMLCanvasElement))
             throw new Error("Screen element is not a <canvas>");
     
+        screenElement.style.width  = "100%";
+        screenElement.style.height = "100%";
+
         function updateScreenElementSize() {
-            screenElement.width  = window.innerWidth;
-            screenElement.height = window.innerHeight;
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            screenElement.width  = window.innerWidth  * devicePixelRatio;
+            screenElement.height = window.innerHeight * devicePixelRatio;
         }
     
         updateScreenElementSize();

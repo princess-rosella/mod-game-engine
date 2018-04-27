@@ -38,6 +38,8 @@ import { Rectangle }                    from "./TextureAtlasCompiler";
 import { readFile }              from "./AsyncFile";
 import { convertEGAFileToPNG }   from "./EGA";
 
+const numberOfFloatPerVertex = 4;
+
 function populateVertexBuffer(buffer: number[], uvX1: number, uvY1: number, uvX2: number, uvY2: number, pivotUVX: number, pivotUVY: number, width: number, height: number): AssetManifestCellBoundingBox {
     const uvW = (uvX2 - uvX1);
     const uvH = (uvY2 - uvY1);
@@ -214,7 +216,7 @@ export class AssetCell extends Asset {
             return undefined;
 
         this.textureID   = rect.part;
-        this.vertexStart = buffer.length;
+        this.vertexStart = buffer.length / numberOfFloatPerVertex;
 
         let pivotX = this.pivotX(overridePivotX);
         let pivotY = this.pivotY(overridePivotY);
@@ -241,7 +243,7 @@ export class AssetCell extends Asset {
 
         populateVertexBuffer(buffer, uvX1, uvY1, uvX2, uvY2, pivotUVX, pivotUVY, rect.width, rect.height);
 
-        this.vertexEnd          = buffer.length;
+        this.vertexEnd          = buffer.length / numberOfFloatPerVertex;
         this.boundingBox.left   = pivotX == 0? 0: -pivotX;
         this.boundingBox.top    = pivotY == 0? 0: -pivotY;
         this.boundingBox.right  = this.png.width  - pivotX;

@@ -30,7 +30,7 @@ import { ILayerWebGL, ElementFlags, IElementWebGL } from "./Interfaces";
 
 export abstract class Element implements IElementWebGL {
     screen: IScreen;
-    flags:  ElementFlags      = 0;
+    flags:  ElementFlags       = 0;
     parent: ILayerWebGL | null = null;
     _z:     number;
 

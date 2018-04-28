@@ -122,6 +122,11 @@ export class ScreenPhysical extends Screen implements IScreenWebGL {
 
         if (this.layer)
             this.createMainLayerMatrix(this.layer.matrix);
+
+        if (this.context)
+            this.context.viewport(0, 0, width, height);
+
+        this.dirty = true;
     }
 
     get plugged(): boolean {

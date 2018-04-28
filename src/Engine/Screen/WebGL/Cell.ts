@@ -38,23 +38,27 @@ export class Cell implements ICell {
     index:       number;
     count:       number;
     boundingBox: Rectangle;
-    ownership:   CellOwnership;
+    ownership:   CellOwnership | undefined;
 
-    constructor(tex: WebGLTexture, vertexes: WebGLBuffer, index: number, count: number, boundingBox: Rectangle, ownership: CellOwnership) {
+    constructor(tex: WebGLTexture, vertexes: WebGLBuffer, index: number, count: number, boundingBox: Rectangle, ownership?: CellOwnership) {
         this.tex         = tex;
         this.vertexes    = vertexes;
         this.index       = index;
         this.count       = count;
         this.boundingBox = boundingBox;
-        this.ownership   = ownership;
+
+        if (ownership)
+            this.ownership = ownership;
     }
 
     invalidate(context: WebGLRenderingContext): void {
-        if (this.tex && (this.ownership & CellOwnership.OwnTexture))
-            context.deleteTexture(this.tex);
+        if (this.ownership) {
+            if (this.tex && (this.ownership & CellOwnership.OwnTexture))
+                context.deleteTexture(this.tex);
 
-        if (this.vertexes && (this.ownership & CellOwnership.OwnVertexes))
-            context.deleteBuffer(this.vertexes);
+            if (this.vertexes && (this.ownership & CellOwnership.OwnVertexes))
+                context.deleteBuffer(this.vertexes);
+        }
 
         this.tex      = null;
         this.vertexes = null;

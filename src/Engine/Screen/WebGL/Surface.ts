@@ -162,6 +162,6 @@ export class Surface implements ISurface {
         // Uniforms
         context.uniformMatrix3fv(info.drawProgramMatrixU, false, matrix.m);
         context.uniform1i(info.drawProgramTextureU, 0);
-        context.drawArrays(context.TRIANGLES, cell.index, cell.count);
+        context.drawArrays(context.TRIANGLE_FAN, cell.index, cell.count);
     }
 }

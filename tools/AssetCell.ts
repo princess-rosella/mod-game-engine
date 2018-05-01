@@ -65,16 +65,6 @@ function populateVertexBuffer(buffer: number[], uvX1: number, uvY1: number, uvX2
     buffer.push(b3h);
 
     buffer.push(uvX1);
-    buffer.push(uvY2);
-    buffer.push(b2);
-    buffer.push(b3);
-
-    buffer.push(uvX2);
-    buffer.push(uvY1);
-    buffer.push(b2w);
-    buffer.push(b3h);
-
-    buffer.push(uvX1);
     buffer.push(uvY1);
     buffer.push(b2);
     buffer.push(b3h);

@@ -32,6 +32,7 @@ import { Layer, MainLayer } from "./Layer";
 import { Matrix3, IReadonlyMatrix3 } from "../../Math/Matrix3";
 import { Features, ILayer, ISprite, ICell, ISurface, ScreenType } from "../Interfaces";
 import { IScreenWebGL } from "./Interfaces";
+import { Rectangle } from "../../Types";
 
 const cellNumberOfFloatPerVertex = 4;
 const cellNumberOfVertex         = 6;
@@ -55,7 +56,7 @@ export class ScreenPhysical extends Screen implements IScreenWebGL {
         this.canvas.addEventListener("webglcontextrestored", (ev) => { this.onContextRestored(ev); });
         this.surface = new Surface(context, null, !!features.needClipping);
         this.layer   = new MainLayer(this);
-        this.createMainLayerMatrix(this.layer.matrix);
+        this.sizeMightHaveChanged();
     }
 
     private onContextLost(ev: Event) {
@@ -76,11 +77,11 @@ export class ScreenPhysical extends Screen implements IScreenWebGL {
             this.delegate.onScreenPlugged(ev);
     }
 
-    private createMainLayerMatrix(out: Matrix3): void {
+    private createMainLayerMatrix(out: Matrix3): Readonly<Rectangle> {
         let resolution = this.features.resolution;
         if (!resolution) {
             out.setSimpleOrtographic(this.size.width, this.size.height);
-            return;
+            return { x: 0, y: 0, width: this.size.width, height: this.size.height };
         }
 
         const resolutionRatio = resolution.width / resolution.height;
@@ -94,7 +95,7 @@ export class ScreenPhysical extends Screen implements IScreenWebGL {
             const blackBarHeight = (this.size.height - scaledHeight) / 2 / scale;
 
             out.setOrtographic(-blackBarWidth, resolution.width + blackBarWidth, -blackBarHeight, resolution.height + blackBarHeight);
-            return;
+            return { x: blackBarWidth * scale, y: blackBarHeight * scale, width: this.size.width - (blackBarWidth / scale), height: this.size.height - (blackBarHeight / scale) };
         }
 
         if (this.features.keepAspectRatio) {
@@ -103,28 +104,37 @@ export class ScreenPhysical extends Screen implements IScreenWebGL {
                 const blackBarHeight = (ajustedHeight - resolution.height) / 2;
 
                 out.setOrtographic(0, resolution.width, -blackBarHeight, resolution.height + blackBarHeight);
+                return { x: 0, y: blackBarHeight, width: this.size.width, height: this.size.height - blackBarHeight };
             }
             else {
                 const ajustedWidth   = resolution.height * canvasRatio;
                 const blackBarWidth  = (ajustedWidth - resolution.width) / 2;
 
                 out.setOrtographic(-blackBarWidth, resolution.width + blackBarWidth, 0, resolution.height);
+                return { x: blackBarWidth, y: 0, width: this.size.width - blackBarWidth, height: this.size.height };
             }
-
-            return;
         }
 
         out.setSimpleOrtographic(this.size.width, this.size.height);
+        return { x: 0, y: 0, width: this.size.width, height: this.size.height };
     }
 
     onSizeChanged(width: number, height: number, previousWidth: number, previousHeight: number) {
         super.onSizeChanged(width, height, previousWidth, previousHeight);
 
-        if (this.layer)
-            this.createMainLayerMatrix(this.layer.matrix);
+        let rect: Readonly<Rectangle> | undefined;
 
-        if (this.context)
+        if (this.layer)
+            rect = this.createMainLayerMatrix(this.layer.matrix);
+
+        if (this.context && rect) {
             this.context.viewport(0, 0, width, height);
+
+            if (rect) {
+                this.context.enable(this.context.SCISSOR_TEST);
+                this.context.scissor(rect.x, rect.y, rect.width, rect.height);
+            }
+        }
 
         this.dirty = true;
     }

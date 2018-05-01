@@ -218,7 +218,7 @@ export interface ILayer extends IElement {
  * Used to provide the visual representation of a sprite.
  */
 export interface ICell {
-    boundingBox: Rectangle;
+    boundingBox: Readonly<Rectangle>;
 }
 
 export interface ISprite extends IElement {

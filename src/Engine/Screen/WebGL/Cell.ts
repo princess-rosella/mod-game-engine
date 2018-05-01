@@ -37,15 +37,15 @@ export class Cell implements ICell {
     vertexes:    WebGLBuffer  | null;
     index:       number;
     count:       number;
-    boundingBox: Rectangle;
+    boundingBox: Readonly<Rectangle>;
     ownership:   CellOwnership | undefined;
 
-    constructor(tex: WebGLTexture, vertexes: WebGLBuffer, index: number, count: number, boundingBox: Rectangle, ownership?: CellOwnership) {
+    constructor(tex: WebGLTexture, vertexes: WebGLBuffer, index: number, count: number, boundingBox: Readonly<Rectangle>, ownership?: CellOwnership) {
         this.tex         = tex;
         this.vertexes    = vertexes;
         this.index       = index;
         this.count       = count;
-        this.boundingBox = boundingBox;
+        this.boundingBox = Object.freeze(<Rectangle>boundingBox);
 
         if (ownership)
             this.ownership = ownership;

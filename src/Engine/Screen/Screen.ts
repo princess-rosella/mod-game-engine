@@ -45,7 +45,6 @@ export abstract class Screen implements IScreenPhysical {
         canvasToScreen.set(canvas, this);
         this.canvas   = canvas;
         this.features = Object.freeze(Object.assign({}, features));
-        this.sizeMightHaveChanged();
     }
 
     static get(canvas: HTMLCanvasElement): IScreen | undefined {

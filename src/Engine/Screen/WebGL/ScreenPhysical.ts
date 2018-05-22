@@ -35,25 +35,30 @@ import { IScreenWebGL } from "./Interfaces";
 import { Rectangle } from "../../Types";
 
 const cellNumberOfFloatPerVertex = 4;
-const cellNumberOfVertex         = 6;
+const cellNumberOfVertex         = 4;
 
 const floor = Math.floor;
 const min   = Math.min;
 const max   = Math.max;
 
 export class ScreenPhysical extends Screen implements IScreenWebGL {
-    context: WebGLRenderingContext;
-    layer:   MainLayer;
-    surface: Surface;
+    audioContext!: AudioContext;
+    context:       WebGLRenderingContext;
+    layer:         MainLayer;
+    surface:       Surface;
 
     depthTextureExtension: WEBGL_depth_texture | null;
 
     constructor(canvas: HTMLCanvasElement, features: Features, context: WebGLRenderingContext) {
         super(canvas, features);
-        this.context = context;
+        this.audioContext = new AudioContext();
+        this.context      = context;
+
         this.depthTextureExtension = context.getExtension("WEBGL_depth_texture");
+
         this.canvas.addEventListener("webglcontextlost",     (ev) => { this.onContextLost(ev);     });
         this.canvas.addEventListener("webglcontextrestored", (ev) => { this.onContextRestored(ev); });
+
         this.surface = new Surface(context, null, !!features.needClipping);
         this.layer   = new MainLayer(this);
         this.sizeMightHaveChanged();
@@ -185,19 +190,9 @@ export class ScreenPhysical extends Screen implements IScreenWebGL {
         buffer[index + 11] = b3h;
 
         buffer[index + 12] = uvX1;
-        buffer[index + 13] = uvY2;
+        buffer[index + 13] = uvY1;
         buffer[index + 14] = b2;
-        buffer[index + 15] = b3;
-
-        buffer[index + 16] = uvX2;
-        buffer[index + 17] = uvY1;
-        buffer[index + 18] = b2w;
-        buffer[index + 19] = b3h;
-
-        buffer[index + 20] = uvX1;
-        buffer[index + 21] = uvY1;
-        buffer[index + 22] = b2;
-        buffer[index + 23] = b3h;
+        buffer[index + 15] = b3h;
     }
 
     createCellWithWebGLTexture(tex: WebGLTexture, uvX1: number, uvY1: number, uvX2: number, uvY2: number, pivotUVX: number, pivotUVY: number, width: number, height: number, ownership: CellOwnership = CellOwnership.OwnVertexes): ICell {
@@ -244,16 +239,24 @@ export class ScreenPhysical extends Screen implements IScreenWebGL {
     }
 
     createSurface(width: number, height: number, features: Features) : ISurface {
-        const gl  = this.context;
-        const fbo = gl.createFramebuffer();
-        const colorTex = gl.createTexture();
+        const gl = this.context;
 
-        gl.bindTexture(gl.TEXTURE_2D, colorTex);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        const fbo = gl.createFramebuffer();
+        if (!fbo)
+            throw new Error("Failed to create WebGL framebuffer");
+
+        const colorTex = gl.createTexture();
+        if (!colorTex)
+            throw new Error("Failed to create WebGL texture");
+
+        const TEXTURE_2D = gl.TEXTURE_2D;
+
+        gl.bindTexture(TEXTURE_2D, colorTex);
+        gl.texParameteri(TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, colorTex, 0);
@@ -263,26 +266,36 @@ export class ScreenPhysical extends Screen implements IScreenWebGL {
 
         if (hasStencil) {
             depthStencilTex = gl.createTexture();
-            gl.bindTexture(gl.TEXTURE_2D, colorTex);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_STENCIL, width, height, 0, gl.DEPTH_STENCIL, this.depthTextureExtension!.UNSIGNED_INT_24_8_WEBGL, null);
+            if (!depthStencilTex)
+                throw new Error("Failed to create WebGL texture");
+
+            gl.bindTexture(TEXTURE_2D, depthStencilTex);
+            gl.texParameteri(TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texImage2D(TEXTURE_2D, 0, gl.DEPTH_STENCIL, width, height, 0, gl.DEPTH_STENCIL, this.depthTextureExtension!.UNSIGNED_INT_24_8_WEBGL, null);
 
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.TEXTURE_2D, depthStencilTex, 0);
         }
         else if (features.needDepth && this.depthTextureExtension) {
             depthStencilTex = gl.createTexture();
-            gl.bindTexture(gl.TEXTURE_2D, colorTex);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, width, height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+            if (!depthStencilTex)
+                throw new Error("Failed to create WebGL texture");
+            
+            gl.bindTexture(TEXTURE_2D, depthStencilTex);
+            gl.texParameteri(TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texImage2D(TEXTURE_2D, 0, gl.DEPTH_COMPONENT, width, height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
 
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, depthStencilTex, 0);
         }
+
+        const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        if (status != gl.FRAMEBUFFER_COMPLETE)
+            throw new Error(`Invalid framebuffer status: ${status}`);
 
         return new Surface(gl, fbo, hasStencil, colorTex, depthStencilTex);
     }

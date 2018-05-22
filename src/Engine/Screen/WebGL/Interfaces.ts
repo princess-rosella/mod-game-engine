@@ -32,6 +32,7 @@ export const enum ElementFlags {
 
 export interface IScreenWebGL extends IScreen {
     readonly context: WebGLRenderingContext;
+    readonly audioContext: AudioContext;
 }
 
 export interface IElementWebGL extends IElement {

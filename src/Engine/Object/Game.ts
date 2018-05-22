@@ -51,7 +51,7 @@ function loadImage(gl: WebGLRenderingContext, src: string, width?: number, heigh
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
             resolve(tex);
         };
@@ -89,13 +89,29 @@ async function loadJSON<T>(src: string): Promise<T> {
     return <T>await response.json();
 }
 
-function loadGeneric(gl: WebGLRenderingContext, src: string): Promise<any> {
+function loadAudioBuffer(aud: AudioContext, buffer: ArrayBuffer): Promise<AudioBuffer> {
+    return new Promise<AudioBuffer>((resolve, reject) => {
+        aud.decodeAudioData(
+            buffer,
+            (audioBuffer) => resolve(audioBuffer),
+            (error)       => reject(error)
+        );
+    });
+}
+
+async function loadAudio(aud: AudioContext, src: string): Promise<AudioBuffer> {
+    return await loadAudioBuffer(aud, await loadBuffer(src));
+}
+
+function loadGeneric(gl: WebGLRenderingContext, aud: AudioContext, src: string): Promise<any> {
     if (src.endsWith(".json"))
         return loadJSON<any>(src);
     else if (src.endsWith(".png"))
         return loadImage(gl, src);
     else if (src.endsWith(".vertices.data"))
         return loadVertices(gl, src);
+    else if (src.endsWith(".mp3"))
+        return loadAudio(aud, src);
     else
         return loadBuffer(src);
 }
@@ -132,9 +148,10 @@ export class Game {
         const files    = new Map<string, any>();
         const screenGL = <IScreenWebGL>this.screen;
         const gl       = screenGL.context;
+        const aud      = screenGL.audioContext;
 
         for (const file in this.manifest[name]) {
-            promises.push(loadGeneric(gl, this.baseURL + file).then((value) => {
+            promises.push(loadGeneric(gl, aud, this.baseURL + file).then((value) => {
                 files.set(file, value);
             }));
         }
